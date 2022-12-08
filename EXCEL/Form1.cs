@@ -11,11 +11,11 @@ using System.Windows.Forms;
 using NCalc;
 namespace EXCEL
 {
-    
+
     public partial class Form1 : Form
     {
         List<List<string>> formulas;
-        List<List<int> > values;
+        List<List<int>> values;
         List<List<bool>> good;
         //DataGridViewCell template;
         public Form1()
@@ -26,27 +26,39 @@ namespace EXCEL
             //template = dataGridView1.Columns[0].CellTemplate;
             InitializeComponent();
         }
-        
+
         void calculate()
         {
+            const int nll = -874533;
             List<Tuple<string, int>> pars = new List<Tuple<string, int>>();
+            for (int i = 0; i < dataGridView1.Rows.Count; i++)
+                for (int j = 0; j < dataGridView1.ColumnCount; j++)
+                    if (formulas[i][j] != "" && dataGridView1[j, i].Value != "CANT EVAL")
+                    {
+                        try
+                        {
+                            values[i][j] = Int32.Parse(formulas[i][j].ToString());
+                            dataGridView1[j, i].Value = values[i][j].ToString();
+                        }
+                        catch (Exception ex) { values[i][j] = nll; }
+                    }
             for (int tt = 0; tt < dataGridView1.RowCount * dataGridView1.ColumnCount; tt++)
             {
                 for (int i = 0; i < dataGridView1.Rows.Count; i++)
                     for (int j = 0; j < dataGridView1.ColumnCount; j++)
-                        if (good[i][j])
+                        if (values[i][j] != nll && formulas[i][j] != "" && dataGridView1[j, i].Value != "CANT EVAL")
                         {
                             try
                             {
                                 var s = values[i][j];
                                 pars.Add(new Tuple<string, int>(HelperFuncs.cv(j, i + 1), s));
                             }
-                            catch (Exception ex) {}
+                            catch (Exception ex) { }
                         }
                 bool any = false;
                 for (int i = 0; i < dataGridView1.Rows.Count; i++)
                     for (int j = 0; j < dataGridView1.ColumnCount; j++)
-                        if (formulas[i][j] != "" && !good[i][j])
+                        if (formulas[i][j] != "" && values[i][j] == nll)
                         {
                             var s = formulas[i][j];
                             try
@@ -55,13 +67,14 @@ namespace EXCEL
                                 foreach (var t in pars)
                                     exp.Parameters[t.Item1] = t.Item2;
                                 var ans = exp.Evaluate();
+                                if (HelperFuncs.bad(formulas[i][j], ((char)('A' + j)).ToString() + ((char)('1' + i)).ToString())) { throw new Exception(); }
                                 values[i][j] = Int32.Parse(ans.ToString());
-                                good[i][j] = true;
-                                    any = true;
+                                any = true;
                                 dataGridView1[j, i].Value = values[i][j].ToString();
                             }
                             catch (Exception ex)
                             {
+                                dataGridView1[j, i].Value = "CANT EVAL";
                                 // MessageBox.Show(String.Format("Trash at {0}, {1}", i, j));
                             }
 
@@ -121,9 +134,17 @@ namespace EXCEL
         {
             int i = e.RowIndex;
             int j = e.ColumnIndex;
-            formulas[i][j] = dataGridView1[j, i].Value.ToString();
-            good[i][j] = false;
-            calculate();
+            try
+            {
+                formulas[i][j] = dataGridView1[j, i].Value.ToString();
+                good[i][j] = false;
+                calculate();
+
+            }
+            catch (Exception ex)
+            {
+
+            }
         }
 
         private void textBox1_Leave(object sender, EventArgs e)
@@ -143,7 +164,7 @@ namespace EXCEL
             else
                 MessageBox.Show("Error while saving data");
         }
-        
+
         private void button4_Click_1(object sender, EventArgs e)
         {
 
@@ -174,6 +195,11 @@ namespace EXCEL
 
             calculate();
         }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Кнопки <<Add new row/column>> додають відповідно один рядок, одну колонку. Налаштований інтерфейс, який дозволяє зберігати таблицю до файлу з довільним розширенням і завантажувати звідти таблицю. За нього відповідають кнопки Save to file, Load from file\nТаблиця підтримує числові значення, математичні вирази та посилання на клітини. При введені некорректних значень розрахунки не проводяться.", "Програма - аналог EXCEL");
+        }
     }
     static class HelperFuncs
     {
@@ -185,6 +211,10 @@ namespace EXCEL
         public static String cv(int x, int y)
         {
             return toA(x) + y.ToString();
+        }
+        public static bool bad(string x, string y)
+        {
+            return x.Contains(y);
         }
         public static List<List<string>> get_formulas(string line)
         {
